@@ -15,7 +15,48 @@ export default function Home() {
   const [xrayReport, setXrayReport] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+function getValue(text: string, key: string) {
+  const regex = new RegExp(`${key}\\s*:?\\s*([0-9.]+)`, "i");
+  const match = text.match(regex);
 
+  return match ? Number(match[1]) : null;
+}
+
+function getAbnormalParameters() {
+  const plt = getValue(hemogram, "PLT");
+  const hgb = getValue(hemogram, "HGB");
+  const hct = getValue(hemogram, "HCT");
+
+  const alt = getValue(biochemistry, "ALT");
+  const ast = getValue(biochemistry, "AST");
+  const ck = getValue(biochemistry, "CK");
+  const ca = getValue(biochemistry, "Ca");
+
+  const rows = [];
+
+  if (plt !== null && plt < 100)
+    rows.push(["PLT", plt, "Kritik düşük", "Trombositopeni"]);
+
+  if (hgb !== null && hgb < 9)
+    rows.push(["HGB", hgb, "Düşük", "Anemi"]);
+
+  if (hct !== null && hct < 30)
+    rows.push(["HCT", hct, "Düşük", "Anemi / hemodilüsyon"]);
+
+  if (alt !== null && alt > 145)
+    rows.push(["ALT", alt, "Yüksek", "Hepatoselüler hasar"]);
+
+  if (ast !== null && ast > 48)
+    rows.push(["AST", ast, "Yüksek", "Kas / karaciğer ilişkili"]);
+
+  if (ck !== null && ck > 315)
+    rows.push(["CK", ck, "Çok yüksek", "Kas hasarı şüphesi"]);
+
+  if (ca !== null && ca < 1.95)
+    rows.push(["Ca", ca, "Düşük", "Hipokalsemi"]);
+
+  return rows;
+}
   async function analyze() {
     setLoading(true);
     setResult("");
@@ -218,7 +259,56 @@ CK: 2045`);
                   <div className="text-lg font-bold text-green-300 mt-1">Stabil</div>
                 </div>
               </div>
+<div className="mb-4 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden">
+  <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+    <h3 className="font-bold">Anormal Parametreler</h3>
 
+    <span className="text-xs text-slate-500">
+      Otomatik analiz
+    </span>
+  </div>
+
+  <div className="divide-y divide-slate-800 text-sm">
+    <div className="grid grid-cols-4 gap-2 px-4 py-3 text-slate-400 font-semibold">
+      <div>Parametre</div>
+      <div>Değer</div>
+      <div>Durum</div>
+      <div>Klinik Anlam</div>
+    </div>
+
+    {getAbnormalParameters().length === 0 && (
+      <div className="px-4 py-4 text-slate-500">
+        Anormal parametre bulunamadı.
+      </div>
+    )}
+
+    {getAbnormalParameters().map((row, index) => (
+      <div
+        key={index}
+        className="grid grid-cols-4 gap-2 px-4 py-3"
+      >
+        <div className="font-semibold">{row[0]}</div>
+
+        <div>{row[1]}</div>
+
+        <div
+          className={
+            String(row[2]).includes("Kritik") ||
+            String(row[2]).includes("Çok")
+              ? "text-red-300 font-bold"
+              : "text-amber-300 font-bold"
+          }
+        >
+          {row[2]}
+        </div>
+
+        <div className="text-slate-400">
+          {row[3]}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
               {!result && (
                 <div className="border border-dashed border-slate-700 rounded-2xl p-8 text-slate-500 min-h-[420px]">
                   Analiz sonucu burada gösterilecek.
