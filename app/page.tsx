@@ -197,7 +197,9 @@ CK: 2045`);
   function copyReport() {
     navigator.clipboard.writeText(result);
   }
-
+function downloadPDF() {
+  window.print();
+}
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
@@ -335,16 +337,25 @@ className="bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"
 
             <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-2xl font-bold">AI Rapor Paneli</h2>
-                <button
-                  onClick={copyReport}
-                  className="text-xs bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-slate-300"
-                >
-                  Raporu Kopyala
-                </button>
-              </div>
+<div className="flex items-center justify-between mb-5">
+  <h2 className="text-2xl font-bold">AI Rapor Paneli</h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+  <div className="flex gap-2">
+    <button
+      onClick={copyReport}
+      className="text-xs bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-slate-300"
+    >
+      Raporu Kopyala
+    </button>
+
+    <button
+      onClick={downloadPDF}
+      className="text-xs bg-cyan-400 text-slate-950 font-bold rounded-xl px-3 py-2"
+    >
+      PDF İndir
+    </button>
+  </div>
+</div>
                 <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
                   <div className="text-xs text-slate-500">Hematoloji</div>
                   <div className="text-lg font-bold text-red-300 mt-1">
