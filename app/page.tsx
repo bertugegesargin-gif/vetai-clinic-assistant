@@ -6,6 +6,8 @@ export default function Home() {
   const [species, setSpecies] = useState("");
   const [breed, setBreed] = useState("");
   const [age, setAge] = useState("");
+  const [weight, setWeight] = useState("");
+const [temperature, setTemperature] = useState("");
   const [sex, setSex] = useState("");
   const [complaint, setComplaint] = useState("");
   const [anamnesis, setAnamnesis] = useState("");
@@ -57,6 +59,78 @@ function getAbnormalParameters() {
 
   return rows;
 }
+function getRiskSummary() {
+  function getMissingData() {
+  const missing = [];
+
+  if (!species) missing.push("Tür");
+  if (!breed) missing.push("Irk");
+  if (!age) missing.push("Yaş");
+  if (!gender) missing.push("Cinsiyet");
+
+  if (!weight) missing.push("Kilo");
+  if (!temperature) missing.push("Ateş");
+
+  if (!complaint) missing.push("Şikayet");
+  if (!anamnesis) missing.push("Anamnez");
+  if (!exam) missing.push("Fizik muayene");
+
+  if (!hemogram) missing.push("Hemogram");
+  if (!biochemistry) missing.push("Biyokimya");
+
+  return missing;
+}
+  const abnormalCount = getAbnormalParameters().length;
+
+  const plt = getValue(hemogram, "PLT");
+  const hgb = getValue(hemogram, "HGB");
+  const hct = getValue(hemogram, "HCT");
+  const ck = getValue(biochemistry, "CK");
+  const crea = getValue(biochemistry, "CREA");
+  const bun = getValue(biochemistry, "BUN");
+
+  const hematologyRisk =
+    (plt !== null && plt < 100) ||
+    (hgb !== null && hgb < 9) ||
+    (hct !== null && hct < 30);
+
+  const muscleRisk = ck !== null && ck > 315;
+
+  const renalRisk =
+    (crea !== null && crea > 180) ||
+    (bun !== null && bun > 13.8);
+
+  let generalRisk = "Düşük";
+  if (abnormalCount >= 2) generalRisk = "Orta";
+  if (abnormalCount >= 4) generalRisk = "Orta-Yüksek";
+  if (abnormalCount >= 6) generalRisk = "Yüksek";
+
+  return {
+    generalRisk,
+    abnormalCount,
+    hematology: hematologyRisk ? "Riskli" : "Stabil",
+    muscle: muscleRisk ? "Şüpheli" : "Stabil",
+    renal: renalRisk ? "Riskli" : "Stabil",
+  };
+}
+function getMissingData() {
+  const missing = [];
+
+  if (!species) missing.push("Tür");
+  if (!breed) missing.push("Irk");
+  if (!age) missing.push("Yaş");
+  if (!sex) missing.push("Cinsiyet");
+  if (!weight) missing.push("Kilo");
+  if (!temperature) missing.push("Ateş");
+  if (!complaint) missing.push("Şikayet");
+  if (!anamnesis) missing.push("Anamnez");
+  if (!exam) missing.push("Fizik muayene");
+  if (!hemogram) missing.push("Hemogram");
+  if (!biochemistry) missing.push("Biyokimya");
+  if (!xrayReport) missing.push("Röntgen raporu");
+
+  return missing;
+}
   async function analyze() {
     setLoading(true);
     setResult("");
@@ -92,6 +166,8 @@ function getAbnormalParameters() {
     setSpecies("Kedi");
     setBreed("Tekir");
     setAge("3");
+    setWeight("3.8");
+setTemperature("39.7");
     setSex("Erkek");
     setComplaint("Halsizlik, iştahsızlık, hareket etmek istememe.");
     setAnamnesis("Hasta son 2 gündür iştahsız. Travma öyküsü net değil. Aşı geçmişi bilinmiyor.");
@@ -187,14 +263,24 @@ CK: 2045`);
 
             <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-5">
               <div className="text-xs text-red-300">Risk Seviyesi</div>
-              <div className="text-2xl font-bold mt-2 text-red-200">Orta-Yüksek</div>
-              <div className="text-sm text-red-300/70">Trombosit / CK takibi</div>
+              <div className="text-2xl font-bold mt-2 text-red-200">
+  {getRiskSummary().generalRisk}
+</div>
+              <div className="text-sm text-red-300/70">
+  {getRiskSummary().abnormalCount} anormal parametre
+</div>
             </div>
 
             <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-5">
               <div className="text-xs text-amber-300">Eksik Veri</div>
-              <div className="text-2xl font-bold mt-2 text-amber-200">3 Alan</div>
-              <div className="text-sm text-amber-300/70">Ateş, kilo, görüntüleme</div>
+              <div className="text-2xl font-bold mt-2 text-amber-200">
+  {getMissingData().length} Alan
+</div>
+              <div className="text-sm text-amber-300/70">
+  {getMissingData().length > 0
+    ? getMissingData().slice(0, 3).join(", ")
+    : "Eksik veri yok"}
+</div>
             </div>
           </div>
 
@@ -212,6 +298,19 @@ CK: 2045`);
                 <input value={breed} onChange={(e) => setBreed(e.target.value)} placeholder="Irk" className="bg-slate-950 border border-slate-700 rounded-xl p-3" />
                 <input value={age} onChange={(e) => setAge(e.target.value)} placeholder="Yaş" className="bg-slate-950 border border-slate-700 rounded-xl p-3" />
                 <input value={sex} onChange={(e) => setSex(e.target.value)} placeholder="Cinsiyet" className="bg-slate-950 border border-slate-700 rounded-xl p-3" />
+                <input
+  value={weight}
+  onChange={(e) => setWeight(e.target.value)}
+  placeholder="Kilo (kg)"
+className="bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"
+/>
+
+<input
+  value={temperature}
+  onChange={(e) => setTemperature(e.target.value)}
+  placeholder="Ateş (°C)"
+  className="bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"
+/>
               </div>
 
               <textarea value={complaint} onChange={(e) => setComplaint(e.target.value)} placeholder="Şikayet" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 h-20 mt-3" />
@@ -248,15 +347,21 @@ CK: 2045`);
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                 <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
                   <div className="text-xs text-slate-500">Hematoloji</div>
-                  <div className="text-lg font-bold text-red-300 mt-1">Riskli</div>
+                  <div className="text-lg font-bold text-red-300 mt-1">
+  {getRiskSummary().hematology}
+</div>
                 </div>
                 <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
                   <div className="text-xs text-slate-500">Kas Hasarı</div>
-                  <div className="text-lg font-bold text-amber-300 mt-1">Şüpheli</div>
+                  <div className="text-lg font-bold text-amber-300 mt-1">
+  {getRiskSummary().muscle}
+</div>
                 </div>
                 <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
                   <div className="text-xs text-slate-500">Renal</div>
-                  <div className="text-lg font-bold text-green-300 mt-1">Stabil</div>
+                  <div className="text-lg font-bold text-green-300 mt-1">
+  {getRiskSummary().renal}
+</div>
                 </div>
               </div>
 <div className="mb-4 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden">
