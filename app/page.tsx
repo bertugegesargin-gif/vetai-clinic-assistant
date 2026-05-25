@@ -91,6 +91,7 @@ export default function Home() {
   const [xrayReport, setXrayReport] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState("");
 
   function getSpeciesKey(): SpeciesKey {
     const value = species.toLowerCase();
@@ -251,6 +252,10 @@ export default function Home() {
   }
 
   async function analyze() {
+    if (!hemogram && !biochemistry) {
+  setResult("Lütfen önce hemogram/biyokimya gir veya PDF yükle.");
+  return;
+}
     setLoading(true);
     setResult("");
 
@@ -431,6 +436,58 @@ CK: 2045`);
               <textarea value={anamnesis} onChange={(e) => setAnamnesis(e.target.value)} placeholder="Anamnez" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 h-24 mt-3" />
               <textarea value={exam} onChange={(e) => setExam(e.target.value)} placeholder="Fizik muayene bulguları" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 h-24 mt-3" />
 
+<div className="mt-3 rounded-2xl bg-slate-950 border border-slate-700 p-4">
+  <div className="mt-3 rounded-2xl bg-slate-950 border border-slate-700 p-4">
+  <div className="flex items-center justify-between gap-4">
+    <div>
+      <div className="font-bold text-sm">
+        Laboratuvar PDF Yükle
+      </div>
+
+      <div className="text-xs text-slate-500 mt-1">
+        PDF içeriği otomatik okunur.
+      </div>
+    </div>
+
+    <label className="cursor-pointer bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-200">
+      Dosya Seç
+
+      <input
+        type="file"
+        accept=".pdf"
+        className="hidden"
+onChange={async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  setUploadedFileName(file.name);
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch("/api/extract-lab", {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  alert(data.text);
+
+  setHemogram(data.text);
+  setBiochemistry(data.text);
+}}
+      />
+    </label>
+  </div>
+
+  {uploadedFileName && (
+    <div className="mt-3 text-xs text-cyan-300">
+      Seçilen dosya: {uploadedFileName}
+    </div>
+  )}
+</div>
+</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <textarea value={hemogram} onChange={(e) => setHemogram(e.target.value)} placeholder="Hemogram" className="bg-slate-950 border border-slate-700 rounded-xl p-3 h-44" />
                 <textarea value={biochemistry} onChange={(e) => setBiochemistry(e.target.value)} placeholder="Biyokimya" className="bg-slate-950 border border-slate-700 rounded-xl p-3 h-44" />
