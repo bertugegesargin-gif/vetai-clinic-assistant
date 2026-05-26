@@ -304,29 +304,28 @@ export default function Home() {
     setResult("Laboratuvar dosyası seçildi. OCR modülü ayrı geliştirilecek; şimdilik değerleri Hemogram/Biyokimya alanlarına manuel yapıştır.");
   }
 
-function saveCase() {
-  const newCase = {
-    id: Date.now(),
+async function saveCase() {
+  if (!user) {
+    alert("Giriş yapman lazım.");
+    return;
+  }
+
+  const { error } = await supabase.from("cases").insert({
+    user_id: user.id,
     species,
     breed,
     age,
     sex,
-    weight,
-    temperature,
     complaint,
-    anamnesis,
-    exam,
     hemogram,
     biochemistry,
-    xrayReport,
     result,
-    createdAt: new Date().toLocaleString("tr-TR"),
-  };
+  });
 
-  const updatedCases = [newCase, ...savedCases];
-
-  setSavedCases(updatedCases);
-  localStorage.setItem("vetai_cases", JSON.stringify(updatedCases));
+  if (error) {
+    alert(error.message);
+    return;
+  }
 
   alert("Vaka kaydedildi.");
 }
