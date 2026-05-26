@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 type SpeciesKey = "kedi" | "kopek";
 type Range = { min: number; max: number };
@@ -77,6 +80,8 @@ const referenceRanges: Record<SpeciesKey, RangeTable> = {
 };
 
 export default function Home() {
+ const router = useRouter();
+ const [user, setUser] = useState<any>(null);  
   const [species, setSpecies] = useState("");
   const [breed, setBreed] = useState("");
   const [age, setAge] = useState("");
@@ -92,6 +97,29 @@ export default function Home() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState("");
+  const [savedCases, setSavedCases] = useState<any[]>([]);
+  const [activePanel, setActivePanel] = useState("new-case");
+  useEffect(() => {
+  async function checkUser() {
+    const { data } = await supabase.auth.getUser();
+
+    if (!data.user) {
+      router.push("/login");
+      return;
+    }
+
+    setUser(data.user);
+  }
+
+  checkUser();
+}, [router]);
+  useEffect(() => {
+  const storedCases = localStorage.getItem("vetai_cases");
+
+  if (storedCases) {
+    setSavedCases(JSON.parse(storedCases));
+  }
+}, []);
 
   function getSpeciesKey(): SpeciesKey {
     const value = species.toLowerCase();
@@ -112,7 +140,6 @@ export default function Home() {
 
   function getValue(text: string, key: string) {
     const variants = [key];
-
     if (key === "T_BIL") variants.push("T-BIL", "TBIL");
     if (key === "CHOL") variants.push("CHOL", "TC");
     if (key === "AMY") variants.push("a-AMY", "AMYL", "AMYLASE");
@@ -123,11 +150,10 @@ export default function Home() {
 
     for (const variant of variants) {
       const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const regex = new RegExp(`(^|\\n)\\s*${escaped}\\s*:?\\s*([0-9.]+)`, "i");
+      const regex = new RegExp(`(^|\\n|\\s)${escaped}\\s*:?\\s*([0-9.]+)`, "i");
       const match = text.match(regex);
       if (match) return Number(match[2]);
     }
-
     return null;
   }
 
@@ -175,26 +201,15 @@ export default function Home() {
     ];
 
     const rows: AbnormalRow[] = [];
-
     parameters.forEach((param) => {
       const value = getValue(param.source, param.key);
       const range = getReferenceRange(param.key);
-
       if (value === null || !range) return;
-
       const status = getParameterStatus(param.key, value);
-
       if (status && status !== "Normal") {
-        rows.push([
-          param.key,
-          value,
-          `${range.min} - ${range.max}`,
-          status,
-          param.meaning,
-        ]);
+        rows.push([param.key, value, `${range.min} - ${range.max}`, status, param.meaning]);
       }
     });
-
     return rows;
   }
 
@@ -211,9 +226,7 @@ export default function Home() {
       (plt !== null && plt < (getReferenceRange("PLT")?.min ?? 100)) ||
       (hgb !== null && hgb < (getReferenceRange("HGB")?.min ?? 9)) ||
       (hct !== null && hct < (getReferenceRange("HCT")?.min ?? 30));
-
     const muscleRisk = ck !== null && ck > (getReferenceRange("CK")?.max ?? 315);
-
     const renalRisk =
       (crea !== null && crea > (getReferenceRange("CREA")?.max ?? 180)) ||
       (bun !== null && bun > (getReferenceRange("BUN")?.max ?? 13.8));
@@ -234,7 +247,6 @@ export default function Home() {
 
   function getMissingData() {
     const missing = [];
-
     if (!species) missing.push("Tür");
     if (!breed) missing.push("Irk");
     if (!age) missing.push("Yaş");
@@ -247,44 +259,27 @@ export default function Home() {
     if (!hemogram) missing.push("Hemogram");
     if (!biochemistry) missing.push("Biyokimya");
     if (!xrayReport) missing.push("Röntgen raporu");
-
     return missing;
   }
 
   async function analyze() {
     if (!hemogram && !biochemistry) {
-  setResult("Lütfen önce hemogram/biyokimya gir veya PDF yükle.");
-  return;
-}
+      setResult("Lütfen önce hemogram/biyokimya gir veya laboratuvar dosyası seç.");
+      return;
+    }
     setLoading(true);
     setResult("");
-
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          species,
-          breed,
-          age,
-          weight,
-          temperature,
-          sex,
-          complaint,
-          anamnesis,
-          exam,
-          hemogram,
-          biochemistry,
-          xrayReport,
-        }),
+        body: JSON.stringify({ species, breed, age, weight, temperature, sex, complaint, anamnesis, exam, hemogram, biochemistry, xrayReport }),
       });
-
       const data = await response.json();
       setResult(data.result || "Rapor oluşturulamadı.");
     } catch (error) {
       setResult("Bağlantı hatası: " + String(error));
     }
-
     setLoading(false);
   }
 
@@ -298,27 +293,47 @@ export default function Home() {
     setComplaint("Halsizlik, iştahsızlık, hareket etmek istememe.");
     setAnamnesis("Hasta son 2 gündür iştahsız. Travma öyküsü net değil. Aşı geçmişi bilinmiyor.");
     setExam("Mukozalar hafif soluk. Dehidrasyon şüphesi var. Ateş bilgisi yok.");
-    setHemogram(`WBC: 12.16
-Neu#: 8.33
-Lym#: 2.95
-RBC: 4.92
-HGB: 8.2
-HCT: 24.1
-MCV: 49.0
-PLT: 57`);
-    setBiochemistry(`ALB: 26.8
-TP: 59.1
-Ca: 1.42
-GLU: 5.70
-BUN: 9.37
-P: 0.74
-ALT: 206
-AST: 78
-T-BIL: 4.66
-CREA: 135
-CK: 2045`);
+    setHemogram(`WBC: 12.16\nNeu#: 8.33\nLym#: 2.95\nRBC: 4.92\nHGB: 8.2\nHCT: 24.1\nMCV: 49.0\nPLT: 57`);
+    setBiochemistry(`ALB: 26.8\nTP: 59.1\nCa: 1.42\nGLU: 5.70\nBUN: 9.37\nP: 0.74\nALT: 206\nAST: 78\nT-BIL: 4.66\nCREA: 135\nCK: 2045`);
     setXrayReport("Röntgen raporu mevcut değil.");
+    setUploadedFileName("");
   }
+
+  function handleLabFile(file: File) {
+    setUploadedFileName(file.name);
+    setResult("Laboratuvar dosyası seçildi. OCR modülü ayrı geliştirilecek; şimdilik değerleri Hemogram/Biyokimya alanlarına manuel yapıştır.");
+  }
+
+function saveCase() {
+  const newCase = {
+    id: Date.now(),
+    species,
+    breed,
+    age,
+    sex,
+    weight,
+    temperature,
+    complaint,
+    anamnesis,
+    exam,
+    hemogram,
+    biochemistry,
+    xrayReport,
+    result,
+    createdAt: new Date().toLocaleString("tr-TR"),
+  };
+
+  const updatedCases = [newCase, ...savedCases];
+
+  setSavedCases(updatedCases);
+  localStorage.setItem("vetai_cases", JSON.stringify(updatedCases));
+
+  alert("Vaka kaydedildi.");
+}
+async function logout() {
+  await supabase.auth.signOut();
+  router.push("/login");
+}
 
   function copyReport() {
     navigator.clipboard.writeText(result);
@@ -336,46 +351,101 @@ CK: 2045`);
             <div className="text-2xl font-black tracking-tight">VetAI</div>
             <div className="text-sm text-slate-400 mt-1">Klinik Karar Destek</div>
           </div>
-
           <nav className="space-y-2 text-sm">
-            <div className="bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 rounded-xl px-4 py-3 font-semibold">
-              Yeni Vaka
-            </div>
-            <div className="text-slate-400 rounded-xl px-4 py-3">Geçmiş Vakalar</div>
+            <button
+  onClick={() => setActivePanel("new-case")}
+  className="w-full text-left bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 rounded-xl px-4 py-3 font-semibold"
+>
+  Yeni Vaka
+</button>
+            <button
+  onClick={() => setActivePanel("history")}
+  className="w-full text-left text-slate-400 rounded-xl px-4 py-3 hover:bg-slate-800"
+>
+  Geçmiş Vakalar
+</button>
             <div className="text-slate-400 rounded-xl px-4 py-3">Bilgi Tabanı</div>
             <div className="text-slate-400 rounded-xl px-4 py-3">Makale Kütüphanesi</div>
             <div className="text-slate-400 rounded-xl px-4 py-3">Ayarlar</div>
+            <button
+  onClick={logout}
+  className="w-full text-left text-red-300 rounded-xl px-4 py-3 hover:bg-red-500/10"
+>
+  Çıkış Yap
+</button>
           </nav>
-
           <div className="mt-10 rounded-2xl bg-slate-800/70 border border-slate-700 p-4">
             <div className="text-xs text-slate-400">MVP Durumu</div>
-            <div className="mt-2 text-green-300 font-bold">Demo Aktif</div>
-            <div className="text-xs text-slate-500 mt-2">
-              OpenAI bağlantısı hazır. Şu an demo analiz modu çalışıyor.
-            </div>
+            <div className="mt-2 text-green-300 font-bold">Stabil Demo Aktif</div>
+            <div className="text-xs text-slate-500 mt-2">OCR modülü ayrı fazda geliştirilecek.</div>
           </div>
         </aside>
 
         <section className="flex-1 p-6 lg:p-8">
-          <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+          {activePanel === "history" && (
+  <div className="mb-6 rounded-2xl bg-slate-900 border border-slate-800 p-6">
+    <h2 className="text-2xl font-bold mb-4">Geçmiş Vakalar</h2>
+
+    {savedCases.length === 0 && (
+      <div className="text-slate-500">
+        Henüz kaydedilmiş vaka yok.
+      </div>
+    )}
+
+    <div className="space-y-3">
+      {savedCases.map((item) => (
+        <div
+          key={item.id}
+          className="rounded-xl bg-slate-950 border border-slate-800 p-4"
+        >
+          <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-cyan-300 font-semibold">
-                Veteriner Klinik Paneli
+              <div className="font-bold">
+                {item.species || "Tür yok"} / {item.breed || "Irk yok"}
               </div>
-              <h1 className="text-4xl font-black mt-1">
-                AI Destekli Vaka Analizi
-              </h1>
-              <p className="text-slate-400 mt-2">
-                Kedi ve köpeklerde laboratuvar, anamnez ve görüntüleme raporlarını birlikte değerlendirir.
-              </p>
+              <div className="text-xs text-slate-500 mt-1">
+                {item.createdAt}
+              </div>
             </div>
 
             <button
-              onClick={loadDemoCase}
-              className="bg-cyan-400 text-slate-950 font-bold rounded-xl px-5 py-3"
+              onClick={() => {
+                setSpecies(item.species || "");
+                setBreed(item.breed || "");
+                setAge(item.age || "");
+                setSex(item.sex || "");
+                setWeight(item.weight || "");
+                setTemperature(item.temperature || "");
+                setComplaint(item.complaint || "");
+                setAnamnesis(item.anamnesis || "");
+                setExam(item.exam || "");
+                setHemogram(item.hemogram || "");
+                setBiochemistry(item.biochemistry || "");
+                setXrayReport(item.xrayReport || "");
+                setResult(item.result || "");
+                setActivePanel("new-case");
+              }}
+              className="bg-cyan-400 text-slate-950 font-bold rounded-xl px-4 py-2 text-sm"
             >
-              Demo Vakayı Yükle
+              Vakayı Aç
             </button>
+          </div>
+
+          <div className="text-sm text-slate-400 mt-3">
+            {item.complaint || "Şikayet bilgisi yok"}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+          <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+            <div>
+              <div className="text-sm text-cyan-300 font-semibold">Veteriner Klinik Paneli</div>
+              <h1 className="text-4xl font-black mt-1">AI Destekli Vaka Analizi</h1>
+              <p className="text-slate-400 mt-2">Kedi ve köpeklerde laboratuvar, anamnez ve görüntüleme raporlarını birlikte değerlendirir.</p>
+            </div>
+            <button onClick={loadDemoCase} className="bg-cyan-400 text-slate-950 font-bold rounded-xl px-5 py-3">Demo Vakayı Yükle</button>
           </header>
 
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 mb-6">
@@ -384,33 +454,20 @@ CK: 2045`);
               <div className="text-2xl font-bold mt-2">{species || "—"}</div>
               <div className="text-sm text-slate-500">{breed || "Irk bilinmiyor"}</div>
             </div>
-
             <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5">
               <div className="text-xs text-slate-400">Yaş / Cinsiyet</div>
               <div className="text-2xl font-bold mt-2">{age || "—"}</div>
               <div className="text-sm text-slate-500">{sex || "Cinsiyet yok"}</div>
             </div>
-
             <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-5">
               <div className="text-xs text-red-300">Risk Seviyesi</div>
-              <div className="text-2xl font-bold mt-2 text-red-200">
-                {getRiskSummary().generalRisk}
-              </div>
-              <div className="text-sm text-red-300/70">
-                {getRiskSummary().abnormalCount} anormal parametre
-              </div>
+              <div className="text-2xl font-bold mt-2 text-red-200">{getRiskSummary().generalRisk}</div>
+              <div className="text-sm text-red-300/70">{getRiskSummary().abnormalCount} anormal parametre</div>
             </div>
-
             <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-5">
               <div className="text-xs text-amber-300">Eksik Veri</div>
-              <div className="text-2xl font-bold mt-2 text-amber-200">
-                {getMissingData().length} Alan
-              </div>
-              <div className="text-sm text-amber-300/70">
-                {getMissingData().length > 0
-                  ? getMissingData().slice(0, 3).join(", ")
-                  : "Eksik veri yok"}
-              </div>
+              <div className="text-2xl font-bold mt-2 text-amber-200">{getMissingData().length} Alan</div>
+              <div className="text-sm text-amber-300/70">{getMissingData().length > 0 ? getMissingData().slice(0, 3).join(", ") : "Eksik veri yok"}</div>
             </div>
           </div>
 
@@ -418,11 +475,8 @@ CK: 2045`);
             <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-2xl font-bold">Vaka Girişi</h2>
-                <span className="text-xs bg-slate-800 border border-slate-700 rounded-full px-3 py-1 text-slate-400">
-                  Kedi / Köpek MVP
-                </span>
+                <span className="text-xs bg-slate-800 border border-slate-700 rounded-full px-3 py-1 text-slate-400">Kedi / Köpek MVP</span>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input value={species} onChange={(e) => setSpecies(e.target.value)} placeholder="Tür" className="bg-slate-950 border border-slate-700 rounded-xl p-3" />
                 <input value={breed} onChange={(e) => setBreed(e.target.value)} placeholder="Irk" className="bg-slate-950 border border-slate-700 rounded-xl p-3" />
@@ -431,182 +485,113 @@ CK: 2045`);
                 <input value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="Kilo (kg)" className="bg-slate-950 border border-slate-700 rounded-xl p-3 text-white" />
                 <input value={temperature} onChange={(e) => setTemperature(e.target.value)} placeholder="Ateş (°C)" className="bg-slate-950 border border-slate-700 rounded-xl p-3 text-white" />
               </div>
-
               <textarea value={complaint} onChange={(e) => setComplaint(e.target.value)} placeholder="Şikayet" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 h-20 mt-3" />
               <textarea value={anamnesis} onChange={(e) => setAnamnesis(e.target.value)} placeholder="Anamnez" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 h-24 mt-3" />
               <textarea value={exam} onChange={(e) => setExam(e.target.value)} placeholder="Fizik muayene bulguları" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 h-24 mt-3" />
 
-<div className="mt-3 rounded-2xl bg-slate-950 border border-slate-700 p-4">
-  <div className="mt-3 rounded-2xl bg-slate-950 border border-slate-700 p-4">
-  <div className="flex items-center justify-between gap-4">
-    <div>
-      <div className="font-bold text-sm">
-        Laboratuvar PDF Yükle
-      </div>
+              <div className="mt-3 rounded-2xl bg-slate-950 border border-slate-700 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="font-bold text-sm">Laboratuvar Dosyası Yükle</div>
+                    <div className="text-xs text-slate-500 mt-1">OCR ayrı modül olarak geliştirilecek. Şimdilik değerleri manuel yapıştır.</div>
+                    {uploadedFileName && <div className="mt-3 text-xs text-cyan-300">Seçilen dosya: {uploadedFileName}</div>}
+                  </div>
+                  <label className="cursor-pointer bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-200">
+                    Dosya Seç
+                    <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleLabFile(file); }} />
+                  </label>
+                </div>
+              </div>
 
-      <div className="text-xs text-slate-500 mt-1">
-        PDF içeriği otomatik okunur.
-      </div>
-    </div>
-
-    <label className="cursor-pointer bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-200">
-      Dosya Seç
-
-      <input
-        type="file"
-        accept=".pdf"
-        className="hidden"
-onChange={async (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  setUploadedFileName(file.name);
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/extract-lab", {
-    method: "POST",
-    body: formData,
-  });
-
-  const data = await response.json();
-
-  alert(data.text);
-
-  setHemogram(data.text);
-  setBiochemistry(data.text);
-}}
-      />
-    </label>
-  </div>
-
-  {uploadedFileName && (
-    <div className="mt-3 text-xs text-cyan-300">
-      Seçilen dosya: {uploadedFileName}
-    </div>
-  )}
-</div>
-</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <textarea value={hemogram} onChange={(e) => setHemogram(e.target.value)} placeholder="Hemogram" className="bg-slate-950 border border-slate-700 rounded-xl p-3 h-44" />
                 <textarea value={biochemistry} onChange={(e) => setBiochemistry(e.target.value)} placeholder="Biyokimya" className="bg-slate-950 border border-slate-700 rounded-xl p-3 h-44" />
               </div>
-
               <textarea value={xrayReport} onChange={(e) => setXrayReport(e.target.value)} placeholder="Röntgen raporu" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 h-24 mt-3" />
-
+              <button onClick={analyze} disabled={loading} className="w-full mt-4 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black p-4 rounded-xl">{loading ? "AI analiz ediyor..." : "AI Klinik Analiz Oluştur"}</button>
               <button
-                onClick={analyze}
-                disabled={loading}
-                className="w-full mt-4 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black p-4 rounded-xl"
-              >
-                {loading ? "AI analiz ediyor..." : "AI Klinik Analiz Oluştur"}
-              </button>
+  onClick={saveCase}
+  className="w-full mt-3 bg-slate-800 border border-slate-700 text-slate-200 font-bold p-4 rounded-xl"
+>
+  Vakayı Kaydet
+</button>
             </div>
 
             <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-2xl font-bold">AI Rapor Paneli</h2>
-
                 <div className="flex gap-2">
-                  <button
-                    onClick={copyReport}
-                    className="text-xs bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-slate-300"
-                  >
-                    Raporu Kopyala
-                  </button>
-
-                  <button
-                    onClick={downloadPDF}
-                    className="text-xs bg-cyan-400 text-slate-950 font-bold rounded-xl px-3 py-2"
-                  >
-                    PDF İndir
-                  </button>
+                  <button onClick={copyReport} className="text-xs bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-slate-300">Raporu Kopyala</button>
+                  <button onClick={downloadPDF} className="text-xs bg-cyan-400 text-slate-950 font-bold rounded-xl px-3 py-2">PDF İndir</button>
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
-                  <div className="text-xs text-slate-500">Hematoloji</div>
-                  <div className="text-lg font-bold text-red-300 mt-1">
-                    {getRiskSummary().hematology}
-                  </div>
-                </div>
-
-                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
-                  <div className="text-xs text-slate-500">Kas Hasarı</div>
-                  <div className="text-lg font-bold text-amber-300 mt-1">
-                    {getRiskSummary().muscle}
-                  </div>
-                </div>
-
-                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
-                  <div className="text-xs text-slate-500">Renal</div>
-                  <div className="text-lg font-bold text-green-300 mt-1">
-                    {getRiskSummary().renal}
-                  </div>
-                </div>
+                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4"><div className="text-xs text-slate-500">Hematoloji</div><div className="text-lg font-bold text-red-300 mt-1">{getRiskSummary().hematology}</div></div>
+                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4"><div className="text-xs text-slate-500">Kas Hasarı</div><div className="text-lg font-bold text-amber-300 mt-1">{getRiskSummary().muscle}</div></div>
+                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4"><div className="text-xs text-slate-500">Renal</div><div className="text-lg font-bold text-green-300 mt-1">{getRiskSummary().renal}</div></div>
               </div>
-
               <div className="mb-4 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-                  <h3 className="font-bold">Anormal Parametreler</h3>
-                  <span className="text-xs text-slate-500">Otomatik analiz</span>
-                </div>
-
+                <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between"><h3 className="font-bold">Anormal Parametreler</h3><span className="text-xs text-slate-500">Otomatik analiz</span></div>
                 <div className="divide-y divide-slate-800 text-sm">
-                  <div className="grid grid-cols-5 gap-2 px-4 py-3 text-slate-400 font-semibold">
-                    <div>Parametre</div>
-                    <div>Değer</div>
-                    <div>Referans</div>
-                    <div>Durum</div>
-                    <div>Klinik Anlam</div>
-                  </div>
-
-                  {getAbnormalParameters().length === 0 && (
-                    <div className="px-4 py-4 text-slate-500">
-                      Anormal parametre bulunamadı.
-                    </div>
-                  )}
-
+                  <div className="grid grid-cols-5 gap-2 px-4 py-3 text-slate-400 font-semibold"><div>Parametre</div><div>Değer</div><div>Referans</div><div>Durum</div><div>Klinik Anlam</div></div>
+                  {getAbnormalParameters().length === 0 && <div className="px-4 py-4 text-slate-500">Anormal parametre bulunamadı.</div>}
                   {getAbnormalParameters().map((row, index) => (
-                    <div
-                      key={index}
-                      className="grid grid-cols-5 gap-2 px-4 py-3"
-                    >
-                      <div className="font-semibold">{row[0]}</div>
-                      <div>{row[1]}</div>
-                      <div className="text-slate-400">{row[2]}</div>
-                      <div
-                        className={
-                          row[3] === "Yüksek"
-                            ? "text-red-300 font-bold"
-                            : "text-amber-300 font-bold"
-                        }
-                      >
-                        {row[3]}
-                      </div>
-                      <div className="text-slate-400">{row[4]}</div>
-                    </div>
+                    <div key={index} className="grid grid-cols-5 gap-2 px-4 py-3"><div className="font-semibold">{row[0]}</div><div>{row[1]}</div><div className="text-slate-400">{row[2]}</div><div className={row[3] === "Yüksek" ? "text-red-300 font-bold" : "text-amber-300 font-bold"}>{row[3]}</div><div className="text-slate-400">{row[4]}</div></div>
                   ))}
                 </div>
               </div>
-
-              {!result && (
-                <div className="border border-dashed border-slate-700 rounded-2xl p-8 text-slate-500 min-h-[420px]">
-                  Analiz sonucu burada gösterilecek.
-                </div>
-              )}
-
+              {!result && <div className="border border-dashed border-slate-700 rounded-2xl p-8 text-slate-500 min-h-[420px]">Analiz sonucu burada gösterilecek.</div>}
               {result && (
-                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 whitespace-pre-wrap leading-relaxed text-slate-200 min-h-[420px]">
-                  {result}
-                </div>
-              )}
+  <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden min-h-[420px]">
+    <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+      <div>
+        <div className="text-xs text-cyan-300 font-semibold">
+          VetAI Klinik Karar Destek Raporu
+        </div>
+        <div className="text-lg font-bold mt-1">
+          {species || "Hasta"} • {age || "Yaş belirtilmedi"} yaş
+        </div>
+      </div>
 
-              <div className="mt-4 rounded-xl bg-slate-950 border border-slate-800 p-4 text-xs text-slate-500">
-                Klinik uyarı: Bu sistem kesin tanı koymaz. Veteriner hekimin klinik değerlendirmesinin yerine geçmez.
-              </div>
+      <div className="text-xs rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200 px-3 py-1">
+        {getRiskSummary().generalRisk} Risk
+      </div>
+    </div>
+
+    <div className="p-5 leading-relaxed text-slate-200 text-sm space-y-4">
+  {result.split("\n").map((line, index) => {
+    if (line.startsWith("# ")) {
+      return (
+        <h2
+          key={index}
+          className="text-cyan-300 font-bold text-lg mt-6 border-b border-slate-800 pb-2"
+        >
+          {line.replace("# ", "")}
+        </h2>
+      );
+    }
+
+    if (line.startsWith("- ")) {
+      return (
+        <div
+          key={index}
+          className="pl-3 border-l-2 border-slate-700 text-slate-300"
+        >
+          • {line.replace("- ", "")}
+        </div>
+      );
+    }
+
+    return (
+      <p key={index} className="text-slate-300">
+        {line}
+      </p>
+    );
+  })}
+</div>
+  </div>
+)}
+              <div className="mt-4 rounded-xl bg-slate-950 border border-slate-800 p-4 text-xs text-slate-500">Klinik uyarı: Bu sistem kesin tanı koymaz. Veteriner hekimin klinik değerlendirmesinin yerine geçmez.</div>
             </div>
           </div>
         </section>
