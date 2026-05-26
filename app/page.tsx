@@ -95,6 +95,9 @@ export default function Home() {
   const [biochemistry, setBiochemistry] = useState("");
   const [xrayReport, setXrayReport] = useState("");
   const [result, setResult] = useState("");
+  const [clinicName, setClinicName] = useState("");
+const [doctorName, setDoctorName] = useState("");
+const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [savedCases, setSavedCases] = useState<any[]>([]);
@@ -116,6 +119,17 @@ export default function Home() {
     }
 
     setUser(data.user);
+    const { data: profile } = await supabase
+  .from("profiles")
+  .select("*")
+  .eq("user_id", data.user.id)
+  .single();
+
+if (profile) {
+  setClinicName(profile.clinic_name || "");
+  setDoctorName(profile.doctor_name || "");
+  setPhone(profile.phone || "");
+}
   }
 
   checkUser();
@@ -360,7 +374,25 @@ async function logout() {
   await supabase.auth.signOut();
   router.push("/login");
 }
+async function saveProfile() {
+  if (!user) return;
 
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({
+      user_id: user.id,
+      clinic_name: clinicName,
+      doctor_name: doctorName,
+      phone,
+    });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert("Profil kaydedildi.");
+}
   function copyReport() {
     navigator.clipboard.writeText(result);
   }
@@ -369,10 +401,95 @@ async function logout() {
     window.print();
   }
 
+    const formattedDate = new Date().toLocaleDateString("tr-TR");
+
+  function renderReportLine(line: string, index: number) {
+    if (line.startsWith("# ")) {
+      return (
+        <h2 key={index} className="mt-5 mb-2 text-lg font-bold text-slate-900 border-b pb-1">
+          {line.replace("# ", "")}
+        </h2>
+      );
+    }
+
+    if (line.startsWith("- ")) {
+      return (
+        <div key={index} className="ml-3 text-sm text-slate-700">
+          • {line.replace("- ", "")}
+        </div>
+      );
+    }
+
+    return (
+      <p key={index} className="text-sm text-slate-700">
+        {line}
+      </p>
+    );
+  }
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="pdf-report-only hidden">
+  <div className="pdf-page">
+    <div className="pdf-header">
+      <div>
+        <h1>{clinicName || "VetAI Klinik Raporu"}</h1>
+        <p>{doctorName || "Veteriner Hekim"} {phone ? `• ${phone}` : ""}</p>
+      </div>
+      <div className="pdf-date">{formattedDate}</div>
+    </div>
+
+    <div className="pdf-title">
+      <h2>AI Klinik Değerlendirme Raporu</h2>
+      <p>{species || "Hasta"} • {breed || "Irk belirtilmedi"} • {age || "Yaş belirtilmedi"} yaş • {sex || "Cinsiyet belirtilmedi"}</p>
+    </div>
+
+    <div className="pdf-risk-grid">
+      <div>
+        <span>Risk Seviyesi</span>
+        <strong>{getRiskSummary().generalRisk}</strong>
+      </div>
+      <div>
+        <span>Anormal Parametre</span>
+        <strong>{getRiskSummary().abnormalCount}</strong>
+      </div>
+      <div>
+        <span>Hematoloji</span>
+        <strong>{getRiskSummary().hematology}</strong>
+      </div>
+    </div>
+
+    <div className="pdf-section">
+      <h3>Anormal Parametreler</h3>
+      {getAbnormalParameters().map((row, i) => (
+        <div key={i} className="pdf-param-row">
+          <b>{row[0]}</b>
+          <span>{row[1]}</span>
+          <span>{row[2]}</span>
+          <span>{row[3]}</span>
+        </div>
+      ))}
+    </div>
+
+    <div className="pdf-section">
+      <h3>Klinik Rapor</h3>
+      {(result || "Analiz sonucu bulunmuyor.").split("\n").map(renderReportLine)}
+    </div>
+
+    <div className="pdf-signature">
+      <div>
+        <strong>Veteriner Hekim</strong>
+        <p>{doctorName || "Ad Soyad"}</p>
+      </div>
+      <div className="signature-line">İmza / Kaşe</div>
+    </div>
+
+    <div className="pdf-footer">
+      Bu rapor klinik karar destek amaçlıdır. Kesin tanı yerine geçmez.
+    </div>
+  </div>
+</div>
       <div className="flex min-h-screen">
-        <aside className="w-72 bg-slate-900 border-r border-slate-800 p-6 hidden lg:block">
+        <aside className="no-print w-72 bg-slate-900 border-r border-slate-800 p-6 hidden lg:block">
           <div className="mb-10">
             <div className="text-2xl font-black tracking-tight">VetAI</div>
             <div className="text-sm text-slate-400 mt-1">Klinik Karar Destek</div>
@@ -417,6 +534,7 @@ async function logout() {
         Henüz kaydedilmiş vaka yok.
       </div>
     )}
+
 
     <div className="space-y-3">
       {savedCases.map((item) => (
@@ -465,6 +583,43 @@ async function logout() {
     </div>
   </div>
 )}
+{activePanel === "settings" && (
+  <div className="mb-6 rounded-2xl bg-slate-900 border border-slate-800 p-6">
+    <h2 className="text-2xl font-bold mb-4">
+      Klinik Profili
+    </h2>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <input
+        value={clinicName}
+        onChange={(e) => setClinicName(e.target.value)}
+        placeholder="Klinik Adı"
+        className="bg-slate-950 border border-slate-700 rounded-xl p-3"
+      />
+
+      <input
+        value={doctorName}
+        onChange={(e) => setDoctorName(e.target.value)}
+        placeholder="Veteriner Hekim"
+        className="bg-slate-950 border border-slate-700 rounded-xl p-3"
+      />
+
+      <input
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+        placeholder="Telefon"
+        className="bg-slate-950 border border-slate-700 rounded-xl p-3"
+      />
+    </div>
+
+    <button
+      onClick={saveProfile}
+      className="mt-4 bg-cyan-400 text-slate-950 font-bold rounded-xl px-5 py-3"
+    >
+      Profili Kaydet
+    </button>
+  </div>
+)}
           <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
             <div>
               <div className="text-sm text-cyan-300 font-semibold">Veteriner Klinik Paneli</div>
@@ -498,7 +653,7 @@ async function logout() {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6">
+            <div className="no-print rounded-2xl bg-slate-900 border border-slate-800 p-6">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-2xl font-bold">Vaka Girişi</h2>
                 <span className="text-xs bg-slate-800 border border-slate-700 rounded-full px-3 py-1 text-slate-400">Kedi / Köpek MVP</span>
@@ -543,10 +698,10 @@ async function logout() {
 </button>
             </div>
 
-            <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6">
+            <div className="print-report-card rounded-2xl bg-slate-900 border border-slate-800 p-6">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-2xl font-bold">AI Rapor Paneli</h2>
-                <div className="flex gap-2">
+                <div className="no-print flex gap-2">
                   <button onClick={copyReport} className="text-xs bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-slate-300">Raporu Kopyala</button>
                   <button onClick={downloadPDF} className="text-xs bg-cyan-400 text-slate-950 font-bold rounded-xl px-3 py-2">PDF İndir</button>
                 </div>

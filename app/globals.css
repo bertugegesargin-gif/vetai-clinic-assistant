@@ -24,3 +24,158 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  body {
+    background: white !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-report-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    background: white !important;
+    color: black !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .print-report-card * {
+    color: black !important;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+}
+
+.pdf-report-only {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .pdf-report-only,
+  .pdf-report-only * {
+    visibility: visible !important;
+  }
+
+  .pdf-report-only {
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    background: white;
+  }
+
+  .pdf-page {
+    width: 190mm;
+    margin: 0 auto;
+    padding: 18mm;
+    color: #111827;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  .pdf-header {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+
+  .pdf-header h1 {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .pdf-header p,
+  .pdf-date {
+    font-size: 12px;
+    color: #475569;
+  }
+
+  .pdf-title {
+    margin-bottom: 18px;
+  }
+
+  .pdf-title h2 {
+    font-size: 20px;
+    margin: 0 0 6px 0;
+  }
+
+  .pdf-title p {
+    font-size: 13px;
+    color: #475569;
+  }
+
+  .pdf-risk-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .pdf-risk-grid div {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .pdf-risk-grid span {
+    display: block;
+    font-size: 11px;
+    color: #64748b;
+  }
+
+  .pdf-risk-grid strong {
+    font-size: 16px;
+  }
+
+  .pdf-section {
+    margin-top: 18px;
+  }
+
+  .pdf-section h3 {
+    font-size: 15px;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+
+  .pdf-param-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    font-size: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 6px 0;
+  }
+
+  .pdf-signature {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 35px;
+    font-size: 12px;
+  }
+
+  .signature-line {
+    border-top: 1px solid #111827;
+    width: 160px;
+    text-align: center;
+    padding-top: 8px;
+  }
+
+  .pdf-footer {
+    margin-top: 24px;
+    font-size: 10px;
+    color: #64748b;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 8px;
+  }
+}
