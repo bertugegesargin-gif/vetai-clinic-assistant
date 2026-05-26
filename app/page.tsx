@@ -99,6 +99,13 @@ export default function Home() {
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [savedCases, setSavedCases] = useState<any[]>([]);
   const [activePanel, setActivePanel] = useState("new-case");
+  const menuItems = [
+  { id: "new-case", label: "Yeni Vaka" },
+  { id: "history", label: "Geçmiş Vakalar" },
+  { id: "knowledge", label: "Bilgi Tabanı" },
+  { id: "library", label: "Makale Kütüphanesi" },
+  { id: "settings", label: "Ayarlar" },
+];
   useEffect(() => {
   async function checkUser() {
     const { data } = await supabase.auth.getUser();
@@ -114,12 +121,25 @@ export default function Home() {
   checkUser();
 }, [router]);
   useEffect(() => {
-  const storedCases = localStorage.getItem("vetai_cases");
+  async function loadCases() {
+    if (!user) return;
 
-  if (storedCases) {
-    setSavedCases(JSON.parse(storedCases));
+    const { data, error } = await supabase
+      .from("cases")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      alert("Vakalar yüklenemedi: " + error.message);
+      return;
+    }
+
+    setSavedCases(data || []);
   }
-}, []);
+
+  loadCases();
+}, [user]);
 
   function getSpeciesKey(): SpeciesKey {
     const value = species.toLowerCase();
@@ -327,6 +347,13 @@ async function saveCase() {
     return;
   }
 
+  const { data } = await supabase
+  .from("cases")
+  .select("*")
+  .eq("user_id", user.id)
+  .order("created_at", { ascending: false });
+
+setSavedCases(data || []);
   alert("Vaka kaydedildi.");
 }
 async function logout() {
@@ -351,21 +378,21 @@ async function logout() {
             <div className="text-sm text-slate-400 mt-1">Klinik Karar Destek</div>
           </div>
           <nav className="space-y-2 text-sm">
-            <button
-  onClick={() => setActivePanel("new-case")}
-  className="w-full text-left bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 rounded-xl px-4 py-3 font-semibold"
->
-  Yeni Vaka
-</button>
-            <button
-  onClick={() => setActivePanel("history")}
-  className="w-full text-left text-slate-400 rounded-xl px-4 py-3 hover:bg-slate-800"
->
-  Geçmiş Vakalar
-</button>
-            <div className="text-slate-400 rounded-xl px-4 py-3">Bilgi Tabanı</div>
-            <div className="text-slate-400 rounded-xl px-4 py-3">Makale Kütüphanesi</div>
-            <div className="text-slate-400 rounded-xl px-4 py-3">Ayarlar</div>
+ <div className="space-y-2">
+  {menuItems.map((item) => (
+    <button
+      key={item.id}
+      onClick={() => setActivePanel(item.id)}
+      className={
+        activePanel === item.id
+          ? "w-full text-left bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 rounded-xl px-4 py-3 font-semibold"
+          : "w-full text-left text-slate-400 rounded-xl px-4 py-3 hover:bg-slate-800"
+      }
+    >
+      {item.label}
+    </button>
+  ))}
+</div>
             <button
   onClick={logout}
   className="w-full text-left text-red-300 rounded-xl px-4 py-3 hover:bg-red-500/10"
